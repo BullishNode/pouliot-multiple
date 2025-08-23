@@ -2,4 +2,8 @@ node_modules/
 dist/
 
 # Large data files
-data/*.csv
+# Ignore all CSVs by default
+*.csv
+**/*.csv
+# But allow the 10-minute bootstrap dataset
+!data/bootstrap_10min.csv
