@@ -7,7 +7,9 @@ export class DataService {
   private dailyPrices: DailyPrice[] = [];
   private hourlyPrices: HourlyPrice[] = [];
   private readonly DATA_DIR = path.join(process.cwd(), 'data');
-  private readonly BOOTSTRAP_FILE = path.join(this.DATA_DIR, 'bootstrap.csv');
+  private readonly BOOTSTRAP_FILE_10MIN = path.join(this.DATA_DIR, 'bootstrap_10min.csv');
+  private readonly BOOTSTRAP_FILE_5MIN = path.join(this.DATA_DIR, 'bootstrap_5min.csv');
+  private readonly BOOTSTRAP_FILE_1MIN = path.join(this.DATA_DIR, 'bootstrap.csv');
 
   private constructor() {
     this.loadBootstrapData();
@@ -28,8 +30,15 @@ export class DataService {
         return;
       }
 
-      if (fs.existsSync(this.BOOTSTRAP_FILE)) {
-        const csvContent = fs.readFileSync(this.BOOTSTRAP_FILE, 'utf-8');
+      // Prefer 10-minute, then 5-minute, then 1-minute
+      const bootstrapPath = fs.existsSync(this.BOOTSTRAP_FILE_10MIN)
+        ? this.BOOTSTRAP_FILE_10MIN
+        : fs.existsSync(this.BOOTSTRAP_FILE_5MIN)
+          ? this.BOOTSTRAP_FILE_5MIN
+          : this.BOOTSTRAP_FILE_1MIN;
+
+      if (fs.existsSync(bootstrapPath)) {
+        const csvContent = fs.readFileSync(bootstrapPath, 'utf-8');
         const lines = csvContent.split('\n').filter(line => line.trim());
         
         // Skip header if present
@@ -81,7 +90,7 @@ export class DataService {
 
         if (ticks.length > 0) {
           this.processHistoricalTicks(ticks);
-          console.log(`Loaded ${ticks.length} valid historical price ticks`);
+          console.log(`Loaded ${ticks.length} valid historical price ticks from ${path.basename(bootstrapPath)}`);
         } else {
           console.log('No valid price ticks found in bootstrap CSV');
         }
