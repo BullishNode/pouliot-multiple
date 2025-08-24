@@ -3,55 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Price Analysis</title>
+    <title>Pump or Dip?</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 120px;
-            height: 40px;
-        }
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #374151;
-            transition: .4s;
-            border-radius: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 12px;
-            color: white;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 32px;
-            width: 32px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        input:checked + .toggle-slider:before {
-            transform: translateX(80px);
-        }
-        input:checked + .toggle-slider {
-            background-color: #1F2937;
-        }
+        /* removed old toggle styles */
 
         /* Responsive Dial (Horizontal) */
         .dial-wrap { width: 100%; }
@@ -105,8 +60,8 @@
         .status-pill { border: 1px solid transparent; }
         .status-pill-large { font-size: 2.5rem; line-height: 1.1; padding: 0.75rem 1.25rem; }
         /* Tabs */
-        .tab-active { background: #f1f5f9; color: #0f172a; }
-        .tab-inactive { background: #ffffff; color: #475569; }
+        .tab-active { background: #f1f5f9; color: #0f172a; border-bottom: 3px solid #C50909; box-shadow: 0 0 0 1px #111827 inset; }
+        .tab-inactive { background: #ffffff; color: #475569; opacity: 0.8; }
 
         /* Status pill tones (grayscale theme) */
         .status-dip { background: #f3f4f6; border-color: #e5e7eb; color: #111827; }
@@ -135,7 +90,7 @@
     <div class="container mx-auto px-6 py-12 max-w-4xl">
         <!-- Header -->
         <div class="text-center mb-6">
-            <h1 class="text-3xl font-light text-gray-800 mb-2">Dip or Pump?</h1>
+            <h1 class="text-5xl font-light text-gray-800 mb-2">Pump or Dip?</h1>
             <p class="text-gray-600">This tool helps you determine if the price of Bitcoin is dipping or pumping.</p>
         </div>
 
@@ -149,10 +104,21 @@
 
         <!-- Time Frame Toggle as Tabs -->
         <div class="text-center mb-8">
+            <div class="text-sm text-gray-600 mb-2">Select short term or long term horizon</div>
             <div id="timeTabs" class="inline-flex rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-                <button id="tab30d" class="px-4 py-2 text-sm font-semibold tab-inactive border-r border-gray-200 focus:outline-none">30 Days</button>
-                <button id="tab365d" class="px-4 py-2 text-sm font-semibold tab-active focus:outline-none">365 Days</button>
+                <button id="tab30d" class="px-4 py-2 text-sm font-semibold tab-active border-r border-gray-200 focus:outline-none">30 Days</button>
+                <button id="tab365d" class="px-4 py-2 text-sm font-semibold tab-inactive focus:outline-none">365 Days</button>
             </div>
+        </div>
+
+        <!-- Percentile Mode Tabs -->
+        <div class="text-center mb-6">
+            <div class="text-sm text-gray-600 mb-2">Data analysis type</div>
+            <div id="modeTabs" class="inline-flex rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <button id="modeRaw" class="px-4 py-2 text-sm font-semibold tab-inactive border-r border-gray-200 focus:outline-none">Raw</button>
+                <button id="modeVol" class="px-4 py-2 text-sm font-semibold tab-active focus:outline-none">Vol-adjusted</button>
+            </div>
+            <div class="text-xs text-gray-500 mt-2">Applies to labels, dial, summary, and charts</div>
         </div>
 
         <!-- Main Analysis Component -->
@@ -223,11 +189,10 @@
             <div class="flex items-center justify-between mb-2">
                 <div class="text-sm text-gray-600">Historical price (left axis) and price multiple R (right axis)</div>
                 <div class="flex items-center gap-2">
-                    <button id="rangeAll" class="px-2 py-1 text-xs border rounded">All</button>
-                    <button id="range5y" class="px-2 py-1 text-xs border rounded">5Y</button>
-                    <button id="range3y" class="px-2 py-1 text-xs border rounded">3Y</button>
-                    <button id="range1y" class="px-2 py-1 text-xs border rounded">1Y</button>
-                    <button id="resetZoom" class="px-2 py-1 text-xs border rounded">Reset zoom</button>
+                    <button id="zoomAll" class="px-2 py-1 text-xs border rounded">All time</button>
+                    <button id="zoom4y" class="px-2 py-1 text-xs border rounded">4 years</button>
+                    <button id="zoom1y" class="px-2 py-1 text-xs border rounded">Last year</button>
+                    <button id="zoom1m" class="px-2 py-1 text-xs border rounded">Last month</button>
                 </div>
             </div>
             <canvas id="historyChart" height="120"></canvas>
