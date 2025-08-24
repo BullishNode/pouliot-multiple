@@ -12,8 +12,19 @@ class BitcoinPriceGauge {
         this.mode = 'vol'; // 'raw' | 'vol'
         
         this.bindEvents();
+        this.applyModeClasses();
         this.buildDialLegend = () => {}; // no legend anymore
         this.loadInitialData();
+    }
+
+    applyModeClasses() {
+        const modeRaw = document.getElementById('modeRaw');
+        const modeVol = document.getElementById('modeVol');
+        if (!modeRaw || !modeVol) return;
+        modeRaw.classList.toggle('tab-active', this.mode === 'raw');
+        modeRaw.classList.toggle('tab-inactive', this.mode !== 'raw');
+        modeVol.classList.toggle('tab-active', this.mode === 'vol');
+        modeVol.classList.toggle('tab-inactive', this.mode !== 'vol');
     }
 
     async renderPercentileChart() {
@@ -197,6 +208,8 @@ class BitcoinPriceGauge {
             };
             modeRaw.addEventListener('click', () => setMode('raw'));
             modeVol.addEventListener('click', () => setMode('vol'));
+            // Apply default mode classes immediately
+            setMode(this.mode);
         }
         const dl = document.getElementById('downloadBtn');
         if (dl) {
@@ -416,6 +429,13 @@ class BitcoinPriceGauge {
             }
 
             const data = await response.json();
+            // Ensure history cache is available before first render so vol-adjusted mode is accurate on load
+            if (!this._historyCache) {
+                try {
+                    const hr = await fetch(this.historyUrl);
+                    if (hr.ok) this._historyCache = await hr.json();
+                } catch {}
+            }
             this.updateUI(data);
             this.setStatus('Data updated successfully');
         } catch (error) {
