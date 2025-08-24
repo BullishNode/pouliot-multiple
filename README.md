@@ -1,181 +1,120 @@
-# Bitcoin Price Gauge
+# Bitcoin Price Gauge – Logic and Methodology
 
-A real-time Bitcoin price analysis tool that uses the **Price Multiple (R-multiple)** to determine if Bitcoin is currently in a dip or pump phase compared to historical trends.
+This app answers: Is Bitcoin currently dipping or pumping relative to its trend? It does so by comparing price to trailing moving averages, and by ranking today’s deviation against history.
 
-## What it does
+## Horizons and Data Aggregation
 
-The app analyzes Bitcoin's current price relative to its moving averages over two time horizons:
-- **30 days**: Uses hourly data for short-term analysis
-- **365 days**: Uses daily data for long-term analysis
+- 30 days (short‑term): computed on hourly averages
+- 365 days (long‑term): computed on daily averages
 
-For each horizon, it calculates:
-- **Price Multiple**: Current price ÷ Moving Average
-- **Label**: One of 10 human-readable labels from "Very big dip" to "Extreme pump"
-- **Percentile**: How the current multiple ranks historically
-- **SMA**: The Simple Moving Average used for calculations
+Historical raw ticks are downsampled to 10‑minute buckets for repository size, then aggregated to hourly/daily series for analysis and charts.
 
-## Features
+### Data files in `data/`
 
-- 🚀 **Real-time analysis**: Fetches live price from Bull Bitcoin API
-- 📊 **Visual gauge**: Shows market position with an intuitive gauge display
-- 🏷️ **10 clear labels**: From "Very big dip" to "Extreme pump"
-- 📈 **Dual horizons**: 30-day (hourly) and 365-day (daily) analysis
-- 🔄 **Historical context**: Percentile rankings based on historical data
-- 💾 **Data persistence**: Loads bootstrap data and maintains price history
+- `bootstrap_10min.csv` – 10‑minute ticks used as the raw source to build hourly/daily series
+- `history_30d_hourly.csv` – precomputed hourly series with derived metrics
+- `history_365d.csv` – precomputed daily series with derived metrics
 
-## Installation
+Columns in precomputed history files:
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd bitcoin-price-gauge
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Build the project**
-   ```bash
-   npm run build
-   ```
-
-4. **Start the server**
-   ```bash
-   npm start
-   ```
-
-## Development
-
-For development with auto-reload:
-```bash
-npm run dev
+```
+time,price,sma,multiple,percentile,volAdjPercentile
 ```
 
-## Data Setup
+- `time`: ISO UTC timestamp for the sample (start of hour/day)
+- `price`: aggregated average price at `time`
+- `sma`: trailing Simple Moving Average (window matches the horizon; current period excluded)
+- `multiple`: Price Multiple R = price ÷ sma
+- `percentile`: percentile rank of current R within the winsorized historical R distribution (baseline since 2015‑01‑01)
+- `volAdjPercentile`: percentile rank of z = log(R) ÷ rolling σ(log R) (σ window = SMA window), baseline since 2015, winsorized
 
-### Bootstrap Data
-Place your historical price data in `data/bootstrap.csv` with the format:
-```csv
-time,price
-2023-01-01T00:00:00Z,16500.50
-2023-01-01T00:05:00Z,16501.25
-...
-```
+## Core Algorithms
 
-The app will automatically load this data on startup and use it for historical analysis.
+1) Simple Moving Average (SMA)
+- Window lengths: 30 days (hourly samples → 30×24), 365 days (daily samples → 365)
+- Excludes the current sample when computing the trailing average
 
-### Data Format
-- **time**: ISO 8601 timestamp (UTC)
-- **price**: Bitcoin price in USD
+2) Price Multiple (R)
+- R = price ÷ SMA
+- Interprets the magnitude of deviation from trend (e.g., R = 1.10 ≈ 10% above trend)
 
-## API Endpoints
+3) Winsorization
+- To reduce outlier impact, historical distributions are winsorized at the 1st and 99th percentiles before ranking
+
+4) Percentile (Raw)
+- Baseline population: historical R values since 2015‑01‑01 for the selected horizon
+- Output: percentile of the current R within that winsorized distribution
+
+5) Volatility‑adjusted Percentile
+- Compute log(R) for each historical point
+- Compute rolling σ(log R) over the same window as the SMA (30d or 365d)
+- z‑score: z = log(R) ÷ rolling σ(log R)
+- Rank today’s z within the winsorized z distribution since 2015
+- Interpretation: makes different volatility regimes comparable
+
+## Labels
+
+Labels are assigned from percentile bands of the selected analysis type (Raw or Vol‑adjusted):
+
+- 0–10%: Extreme dip
+- 10–20%: Very big dip
+- 20–30%: Big dip
+- 30–40%: Dip
+- 40–50%: Small dip
+- 50–60%: Around average
+- 60–70%: Small pump
+- 70–80%: Pump
+- 80–90%: Big pump
+- 90–100%: Extreme pump
+
+## API
 
 ### GET `/api/summary`
-Returns the current Bitcoin price analysis.
+Current analysis for both horizons. Includes price, SMA, R, raw percentile, historical average, counts over the recent window, and (when available) the latest vol‑adjusted percentile (via history cache).
 
-**Response:**
-```json
+### GET `/api/history`
+Historical series for both horizons. Prefers precomputed CSVs; if absent, computes on the fly from `bootstrap_10min.csv`.
+
+Response shape (per horizon):
+
+```
 {
-  "asOfUTC": "2025-01-22T12:34:56Z",
-  "currentPriceUSD": 61234.56,
-  "priceSource": "BullBitcoin Index USD",
-  "priceAsOfUTC": "2025-01-22T12:34:56Z",
-  "horizons": {
-    "365d": {
-      "multiple": 0.94,
-      "percentile": 0.18,
-      "higherThanPercent": 0.16,
-      "label": "Big dip",
-      "sma": 65245.10,
-      "smaAsOfUTC": "2025-01-22T00:00:00Z",
-      "sampleSize": 365
-    },
-    "30d": {
-      "multiple": 1.07,
-      "percentile": 0.65,
-      "higherThanPercent": 0.62,
-      "label": "Pump",
-      "sma": 57321.93,
-      "smaAsOfUTC": "2025-01-22T12:00:00Z",
-      "sampleSize": 720
-    }
+  horizons: {
+    "365d": [ { t, price, sma, multiple, percentile, volAdjPercentile }, ... ],
+    "30d":  [ { t, price, sma, multiple, percentile, volAdjPercentile }, ... ]
   }
 }
 ```
 
 ### GET `/api/health`
-Health check endpoint.
+Simple health status.
 
-## Label System
+## Price Source
 
-The app uses 10 static labels based on Price Multiple values:
+- Live price: Bull Bitcoin Index USD (fetched server‑side)
+- Historical: repository CSVs listed above
 
-| Multiple Range | Label | Color | Meaning |
-|----------------|-------|-------|---------|
-| < 0.6 | Very big dip | 🟢 Green | Extreme undervaluation |
-| 0.6 - 0.75 | Big dip | 🟢 Green | Significant undervaluation |
-| 0.75 - 0.85 | Dip | 🟢 Green | Moderate undervaluation |
-| 0.85 - 0.95 | Small dip | 🟢 Green | Slight undervaluation |
-| 0.95 - 1.05 | Around average | 🟡 Yellow | Near trend |
-| 1.05 - 1.15 | Small pump | 🔴 Red | Slight overvaluation |
-| 1.15 - 1.25 | Pump | 🔴 Red | Moderate overvaluation |
-| 1.25 - 1.5 | Big pump | 🔴 Red | Significant overvaluation |
-| 1.5 - 2.0 | Very big pump | 🔴 Red | Extreme overvaluation |
-| > 2.0 | Extreme pump | 🔴 Red | Bubble territory |
+## Frontend Visualization
 
-## How it works
+- Dual‑axis charts per horizon:
+  - Price (left axis) and Multiple (right axis)
+  - Price (left axis) and Percentile (right axis; Raw or Vol‑adjusted via UI)
+- Interactive zoom presets (All time, 4 years, Last year, Last month) and synchronized panning/zooming
+- Reference lines for current Multiple and current Percentile
+- Download button to export the currently selected horizon’s history as CSV
 
-1. **Data Collection**: Fetches current price from Bull Bitcoin API
-2. **Aggregation**: Converts 5-minute ticks to hourly and daily averages
-3. **Moving Averages**: Calculates trailing SMAs (excluding current period)
-4. **Price Multiple**: Computes R = Current Price ÷ SMA
-5. **Historical Context**: Ranks current R against historical R values
-6. **Labeling**: Maps R to one of 10 human-readable labels
-7. **Display**: Updates UI with analysis results and visual gauge
+## Architecture
 
-## Technical Details
+- Node.js + Express + TypeScript backend
+- Singleton services:
+  - `DataService` – loads CSVs, builds hourly/daily aggregates
+  - `AnalysisService` – computes SMA, R, percentiles, and vol‑adjusted metrics
+- Frontend: vanilla JS with Chart.js + chartjs‑plugin‑zoom
 
-- **Backend**: Node.js + Express + TypeScript
-- **Frontend**: Vanilla JavaScript + Tailwind CSS
-- **Data Source**: Bull Bitcoin Public API
-- **Storage**: In-memory with CSV bootstrap loading
-- **Architecture**: Singleton services with dependency injection
+## Repository Size Considerations
 
-## Configuration
-
-Environment variables:
-- `PORT`: Server port (default: 3000)
-
-## Troubleshooting
-
-### No historical data
-- Ensure `data/bootstrap.csv` exists with proper format
-- Check console for data loading messages
-
-### API errors
-- Verify Bull Bitcoin API is accessible
-- Check network connectivity
-- Review console error messages
-
-### Gauge not updating
-- Refresh the page
-- Check browser console for JavaScript errors
-- Verify API endpoint is responding
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details.
+GitHub’s 100 MB file limit is respected by downsampling raw ticks to 10‑minute (`bootstrap_10min.csv`) and by publishing compact precomputed history files. The app prefers the precomputed files for fast startup and consistent results.
 
 ## Disclaimer
 
-This tool is for informational purposes only. It does not constitute financial advice. Always do your own research before making investment decisions.
+This tool analyzes historical deviations from trend. It is not a prediction model and is not financial advice.
