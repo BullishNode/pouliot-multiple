@@ -7,3 +7,6 @@ dist/
 **/*.csv
 # But allow the 10-minute bootstrap dataset
 !data/bootstrap_10min.csv
+# And allow precomputed history CSVs for charts
+!data/history_365d.csv
+!data/history_30d_hourly.csv
