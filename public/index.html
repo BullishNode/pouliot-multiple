@@ -217,6 +217,27 @@
         </div>
     </div>
 
+    <!-- Historical Chart -->
+    <div class="container mx-auto px-6 max-w-4xl">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+            <div class="flex items-center justify-between mb-2">
+                <div class="text-sm text-gray-600">Historical price (left axis) and price multiple R (right axis)</div>
+                <div class="flex items-center gap-2">
+                    <button id="rangeAll" class="px-2 py-1 text-xs border rounded">All</button>
+                    <button id="range5y" class="px-2 py-1 text-xs border rounded">5Y</button>
+                    <button id="range3y" class="px-2 py-1 text-xs border rounded">3Y</button>
+                    <button id="range1y" class="px-2 py-1 text-xs border rounded">1Y</button>
+                    <button id="resetZoom" class="px-2 py-1 text-xs border rounded">Reset zoom</button>
+                </div>
+            </div>
+            <canvas id="historyChart" height="120"></canvas>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+            <div class="text-sm text-gray-600 mb-2">Historical price (left axis) and vol-adjusted percentile of R (right axis)</div>
+            <canvas id="percentileChart" height="120"></canvas>
+        </div>
+    </div>
+
     <!-- Footer with logo and attribution -->
     <div class="mt-10 mb-8 flex flex-col items-center gap-3">
         <a href="https://bullbitcoin.com" target="_blank" rel="noopener noreferrer">
@@ -226,8 +247,11 @@
             Created by <span class="font-semibold">Francis Pouliot</span>, founder of Bull Bitcoin —
             <a href="https://x.com/francispouliot_" target="_blank" rel="noopener noreferrer" class="underline" style="text-decoration-color:#C50909;">@francispouliot_</a>
         </div>
+        <button id="downloadBtn" class="mt-2 text-xs text-gray-600 underline" style="text-decoration-color:#C50909;">Download data (CSV)</button>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.umd.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

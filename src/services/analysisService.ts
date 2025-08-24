@@ -24,6 +24,7 @@ export class AnalysisService {
     dailyPrices: number[],
     hourlyPrices: number[]
   ): Promise<PriceAnalysis> {
+    // Enforce 2015-01-01 cutoff implicitly via dataService callers
     const now = new Date();
     const nowISO = now.toISOString();
 

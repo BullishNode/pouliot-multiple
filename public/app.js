@@ -1,6 +1,7 @@
 class BitcoinPriceGauge {
     constructor() {
         this.apiUrl = '/api/summary';
+        this.historyUrl = '/api/history';
         this.refreshBtn = document.getElementById('refreshBtn');
         this.statusElement = document.getElementById('status');
         this.tab30d = document.getElementById('tab30d');
@@ -14,6 +15,113 @@ class BitcoinPriceGauge {
         this.loadInitialData();
     }
 
+    async renderPercentileChart() {
+        try {
+            if (!this._historyCache) {
+                const r = await fetch(this.historyUrl);
+                if (!r.ok) throw new Error('Failed to fetch history');
+                this._historyCache = await r.json();
+            }
+            const tf = this.currentTimeFrame;
+            const points = this._historyCache?.horizons?.[tf] || [];
+            const labels = points.map(p => p.t);
+            const prices = points.map(p => (p && isFinite(p.price) ? p.price : null));
+            const percentiles = points.map(p => (p && isFinite(p.volAdjPercentile) ? p.volAdjPercentile : (p && isFinite(p.percentile) ? p.percentile : null)));
+
+            const ctx = document.getElementById('percentileChart');
+            if (!ctx) return;
+            if (this._pChart) {
+                this._pChart.data.labels = labels;
+                this._pChart.data.datasets[0].data = prices;
+                this._pChart.data.datasets[1].data = percentiles;
+                this._pChart.update('none');
+                return;
+            }
+
+            this._pChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Price (USD)',
+                            data: prices,
+                            yAxisID: 'y',
+                            borderColor: '#111827',
+                            backgroundColor: 'rgba(17,24,39,0.1)',
+                            tension: 0.2,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Vol-adjusted Percentile of R (%)',
+                            data: percentiles,
+                            yAxisID: 'y1',
+                            borderColor: '#0ea5e9',
+                            backgroundColor: 'rgba(14,165,233,0.1)',
+                            tension: 0.2,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    stacked: false,
+                    scales: {
+                        x: {
+                            type: 'category',
+                            ticks: { maxTicksLimit: 8,
+                                callback: function(value) {
+                                    let label = (this && this.getLabelForValue) ? this.getLabelForValue(value) : (typeof value === 'string' ? value : String(value));
+                                    const d = new Date(label);
+                                    if (isNaN(d.getTime())) return label ?? '';
+                                    const mm = String(d.getUTCMonth()+1).padStart(2,'0');
+                                    const yy = String(d.getUTCFullYear()).slice(-2);
+                                    return `${mm}/${yy}`;
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'USD' },
+                            ticks: { callback: (val) => (isFinite(val) ? `$${Number(val).toLocaleString()}` : '--') }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: '%' },
+                            min: 0,
+                            max: 100,
+                            ticks: { callback: (val) => (isFinite(val) ? `${Number(val).toFixed(0)}%` : '--') }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true },
+                        zoom: {
+                            pan: { enabled: true, mode: 'x' },
+                            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const name = ctx.dataset.label || '';
+                                    const y = ctx.parsed.y;
+                                    if (y == null || !isFinite(y)) return `${name}: --`;
+                                    if (name.includes('Price')) return `${name}: $${Number(y).toLocaleString()}`;
+                                    if (name.includes('Percentile')) return `${name}: ${Number(y).toFixed(1)}%`;
+                                    return `${name}: ${y}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (e) {
+            console.warn('Percentile chart render failed:', e);
+        }
+    }
     bindEvents() {
         this.refreshBtn.addEventListener('click', () => this.refreshData());
         if (this.tab30d && this.tab365d) {
@@ -22,6 +130,31 @@ class BitcoinPriceGauge {
         }
         if (this.showMathBtn) {
             this.showMathBtn.addEventListener('click', () => this.toggleMath());
+        }
+        const dl = document.getElementById('downloadBtn');
+        if (dl) {
+            dl.addEventListener('click', async () => {
+                try {
+                    const r = await fetch(this.historyUrl);
+                    if (!r.ok) throw new Error('Failed to fetch history');
+                    const hist = await r.json();
+                    const tf = this.currentTimeFrame;
+                    const rows = hist?.horizons?.[tf] || [];
+                    const header = 'time,price,multiple,percentile,volAdjPercentile\n';
+                    const body = rows.map(p => [p.t, p.price, p.multiple ?? '', p.percentile ?? '', p.volAdjPercentile ?? ''].join(',')).join('\n');
+                    const blob = new Blob([header + body + '\n'], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `history_${tf}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    console.warn('Download failed', e);
+                }
+            });
         }
     }
 
@@ -52,6 +185,18 @@ class BitcoinPriceGauge {
         const asOf = this.currentAnalysisData.asOfUTC;
         const priceAsOf = this.currentAnalysisData.priceAsOfUTC;
 
+        // Try to pull vol-adjusted percentile from precomputed history cache
+        let volAdjPct = '--';
+        try {
+            const points = this._historyCache?.horizons?.[this.currentTimeFrame] || [];
+            if (points.length) {
+                const last = points[points.length - 1];
+                if (last && last.volAdjPercentile != null && isFinite(last.volAdjPercentile)) {
+                    volAdjPct = `${Number(last.volAdjPercentile).toFixed(1)}`;
+                }
+            }
+        } catch {}
+
         this.mathDetails.innerHTML = `
             <div class="space-y-3">
                 <div class="text-sm text-gray-600">As of <span class="hl">${new Date(asOf).toISOString()}</span> (price tick at <span class="hl">${new Date(priceAsOf).toISOString()}</span>)</div>
@@ -60,7 +205,8 @@ class BitcoinPriceGauge {
                 <ul class="list-disc pl-6 text-sm">
                     <li><span class="font-semibold">Price Multiple (R)</span>: R = Current Price ÷ Simple Moving Average (SMA).</li>
                     <li><span class="font-semibold">SMA (${tfText})</span>: Average of prior ${tfText} prices only (current period excluded).</li>
-                    <li><span class="font-semibold">Percentile</span>: Share of historical multiples ≤ current R.</li>
+                    <li><span class="font-semibold">Percentile</span>: Share of historical multiples ≤ current R (baseline: since 2015).</li>
+                    <li><span class="font-semibold">Vol-adjusted percentile</span>: Percentile of z = log(R) ÷ rolling σ(log R) since 2015 (σ window = ${tfText}); winsorized to reduce outliers.</li>
                     <li><span class="font-semibold">Higher-than share</span>: Share of historical multiples > current R.</li>
                     <li><span class="font-semibold">Winsorization</span>: Historical multiples are clipped at the 1st/99th percentiles to reduce outlier impact.</li>
                 </ul>
@@ -80,6 +226,7 @@ class BitcoinPriceGauge {
                 <div><span class="font-semibold">Price vs SMA:</span> ${diffPct}%</div>
                 <div><span class="font-semibold">Historical average R:</span> ${histAvg}</div>
                 <div><span class="font-semibold">Percentile of current R:</span> ${pct}%</div>
+                <div><span class="font-semibold">Vol-adjusted percentile of R:</span> ${volAdjPct === '--' ? '--' : volAdjPct + '%'} </div>
 
                 <div class="font-semibold">How to interpret</div>
                 <ul class="list-disc pl-6 text-sm space-y-1">
@@ -210,6 +357,10 @@ class BitcoinPriceGauge {
 
         // Combined analysis text (includes price diff, timeframe, SMA, historical context)
         this.renderCombinedAnalysis(a);
+
+        // Update or build charts
+        this.renderHistoryChart();
+        this.renderPercentileChart();
     }
 
     formatMultiple(multiple) { return (multiple == null || isNaN(multiple)) ? '--' : multiple.toFixed(3); }
@@ -251,14 +402,157 @@ class BitcoinPriceGauge {
         const histAvgText = this.formatMultiple(a.historicalAverage);
         const priceDiffPct = ((a.multiple - 1) * 100).toFixed(1);
         const percentileText = (a.percentile * 100).toFixed(1);
+        // Pull vol-adjusted from history cache if available
+        let volAdjText = '';
+        try {
+            const points = this._historyCache?.horizons?.[this.currentTimeFrame] || [];
+            if (points.length) {
+                const last = points[points.length - 1];
+                if (last && last.volAdjPercentile != null && isFinite(last.volAdjPercentile)) {
+                    volAdjText = ` (vol-adjusted: <span class="hl">${Number(last.volAdjPercentile).toFixed(1)}%</span>)`;
+                }
+            }
+        } catch {}
         const countHigher = a.countHigherInWindow ?? Math.round((1 - a.percentile) * a.windowLength);
 
         const p1 = `Bitcoin's current price of <span class="hl">${priceText}</span> is <span class="hl">${Math.abs(+priceDiffPct)}% ${+priceDiffPct >= 0 ? 'higher' : 'lower'}</span> than the average of the <span class="hl">${periodLabel}</span>, which was <span class="hl">${smaText}</span>.`;
         const p2 = `This yields a ${horizonText} Price multiple of <span class="hl">${multipleText}</span> versus a historical average multiple of <span class="hl">${histAvgText}</span>.`;
-        const p3 = `The current multiple ranks in the <span class="hl">${percentileText}%</span> percentile, which means that <span class="hl">${countHigher.toLocaleString()} ${unitLabel}</span> over the ${periodLabel} the multiple was higher.`;
-        const conclusion = `<div class="mt-4 p-4 rounded-md border status-dip text-base sm:text-lg"><span class="font-semibold">Conclusion:</span> <span class="font-semibold hl">${a.label}</span> relative to the price trends of the ${periodLabel}.</div>`;
+        const p3 = `Since <span class="hl">2015</span>, the current multiple ranks in the <span class="hl">${percentileText}%</span> percentile${volAdjText}.`;
+        const conclusion = `<div class="mt-4 p-4 rounded-md border status-dip text-base sm:text-lg"><span class="font-semibold">Conclusion:</span> <span class="font-semibold hl">${a.label}</span> relative to the long-term (2015+) trends.</div>`;
 
         el.innerHTML = `<p class="text-base">${p1}</p><p class="text-base mt-2">${p2}</p><p class="text-base mt-2">${p3}</p>${conclusion}`;
+    }
+
+    async renderHistoryChart() {
+        try {
+            if (!this._historyCache) {
+                const r = await fetch(this.historyUrl);
+                if (!r.ok) throw new Error('Failed to fetch history');
+                this._historyCache = await r.json();
+            }
+            const tf = this.currentTimeFrame;
+            const points = this._historyCache?.horizons?.[tf] || [];
+            const labels = points.map(p => p.t);
+            const prices = points.map(p => p.price);
+            const multiples = points.map(p => p.multiple);
+
+            const ctx = document.getElementById('historyChart');
+            if (!ctx) return;
+            if (this._chart) {
+                // Update existing chart
+                this._chart.data.labels = labels;
+                this._chart.data.datasets[0].data = prices;
+                this._chart.data.datasets[1].data = multiples;
+                this._chart.update('none');
+                return;
+            }
+
+            this._chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Price (USD)',
+                            data: prices,
+                            yAxisID: 'y',
+                            borderColor: '#111827',
+                            backgroundColor: 'rgba(17,24,39,0.1)',
+                            tension: 0.2,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Price Multiple (R)',
+                            data: multiples,
+                            yAxisID: 'y1',
+                            borderColor: '#C50909',
+                            backgroundColor: 'rgba(197,9,9,0.1)',
+                            tension: 0.2,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    stacked: false,
+                    scales: {
+                        x: {
+                            type: 'category',
+                            ticks: { maxTicksLimit: 8,
+                                callback: function(value) {
+                                    let label = (this && this.getLabelForValue) ? this.getLabelForValue(value) : (typeof value === 'string' ? value : String(value));
+                                    const d = new Date(label);
+                                    if (isNaN(d.getTime())) return label ?? '';
+                                    const mm = String(d.getUTCMonth()+1).padStart(2,'0');
+                                    const yy = String(d.getUTCFullYear()).slice(-2);
+                                    return `${mm}/${yy}`;
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'USD' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'R' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true },
+                        zoom: {
+                            pan: { enabled: true, mode: 'x' },
+                            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+                        }
+                    }
+                }
+            });
+
+            // Range buttons
+            const toISO = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}T00:00:00Z`;
+            const setRange = (years) => {
+                const last = labels[labels.length - 1];
+                if (!last) return;
+                const end = new Date(last);
+                const start = new Date(end);
+                start.setUTCFullYear(end.getUTCFullYear() - years);
+                const startISO = toISO(start);
+                const idx = labels.findIndex(t => t >= startISO);
+                if (idx >= 0) {
+                    this._chart.scales.x.options.min = labels[idx];
+                    this._chart.scales.x.options.max = labels[labels.length - 1];
+                    this._chart.update('none');
+                    if (this._pChart) {
+                        this._pChart.scales.x.options.min = labels[idx];
+                        this._pChart.scales.x.options.max = labels[labels.length - 1];
+                        this._pChart.update('none');
+                    }
+                }
+            };
+            const q = (id) => document.getElementById(id);
+            q('rangeAll')?.addEventListener('click', () => {
+                this._chart.resetZoom();
+                this._chart.scales.x.options.min = undefined;
+                this._chart.scales.x.options.max = undefined;
+                this._chart.update('none');
+                if (this._pChart) {
+                    this._pChart.resetZoom();
+                    this._pChart.scales.x.options.min = undefined;
+                    this._pChart.scales.x.options.max = undefined;
+                    this._pChart.update('none');
+                }
+            });
+            q('range5y')?.addEventListener('click', () => setRange(5));
+            q('range3y')?.addEventListener('click', () => setRange(3));
+            q('range1y')?.addEventListener('click', () => setRange(1));
+            q('resetZoom')?.addEventListener('click', () => { this._chart.resetZoom(); if (this._pChart) this._pChart.resetZoom(); });
+        } catch (e) {
+            console.warn('Chart render failed:', e);
+        }
     }
 
     setStatus(message) { this.statusElement.textContent = message; console.log(message); }

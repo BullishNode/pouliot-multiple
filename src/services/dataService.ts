@@ -150,11 +150,13 @@ export class DataService {
   }
 
   getDailyPrices(): DailyPrice[] {
-    return [...this.dailyPrices];
+    const CUTOFF = '2015-01-01';
+    return this.dailyPrices.filter(d => d.date >= CUTOFF);
   }
 
   getHourlyPrices(): HourlyPrice[] {
-    return [...this.hourlyPrices];
+    const CUTOFF = '2015-01-01T00:00:00Z';
+    return this.hourlyPrices.filter(h => h.datetime >= CUTOFF);
   }
 
   getDailyPricesForPeriod(days: number): DailyPrice[] {
