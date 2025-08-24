@@ -7,7 +7,8 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         /* Loading */
-        .loading-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.6); }
+        .loading-overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(255,255,255,0.6); }
+        .loading-overlay.show { display: flex; }
         .spinner { width: 24px; height: 24px; border: 3px solid #e5e7eb; border-top-color: #111827; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         /* removed old toggle styles */

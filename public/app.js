@@ -19,7 +19,7 @@ class BitcoinPriceGauge {
     async renderPercentileChart() {
         try {
             const pl = document.getElementById('percentileLoading');
-            if (pl) pl.classList.remove('hidden');
+            if (pl) { pl.classList.add('show'); pl.classList.remove('hidden'); }
             if (!this._historyCache) {
                 const r = await fetch(this.historyUrl);
                 if (!r.ok) throw new Error('Failed to fetch history');
@@ -172,7 +172,7 @@ class BitcoinPriceGauge {
             console.warn('Percentile chart render failed:', e);
         } finally {
             const pl = document.getElementById('percentileLoading');
-            if (pl) pl.classList.add('hidden');
+            if (pl) { pl.classList.remove('show'); pl.classList.add('hidden'); }
         }
     }
     bindEvents() {
@@ -407,8 +407,8 @@ class BitcoinPriceGauge {
             this.refreshBtn.disabled = true;
             this.refreshBtn.textContent = 'Loading...';
             // Show chart loading overlays
-            document.getElementById('historyLoading')?.classList.remove('hidden');
-            document.getElementById('percentileLoading')?.classList.remove('hidden');
+            const hl0 = document.getElementById('historyLoading'); if (hl0) { hl0.classList.add('show'); hl0.classList.remove('hidden'); }
+            const pl0 = document.getElementById('percentileLoading'); if (pl0) { pl0.classList.add('show'); pl0.classList.remove('hidden'); }
 
             const response = await fetch(this.apiUrl);
             if (!response.ok) {
@@ -424,8 +424,8 @@ class BitcoinPriceGauge {
         } finally {
             this.refreshBtn.disabled = false;
             this.refreshBtn.textContent = 'Refresh Analysis';
-            document.getElementById('historyLoading')?.classList.add('hidden');
-            document.getElementById('percentileLoading')?.classList.add('hidden');
+            const hl1 = document.getElementById('historyLoading'); if (hl1) { hl1.classList.remove('show'); hl1.classList.add('hidden'); }
+            const pl1 = document.getElementById('percentileLoading'); if (pl1) { pl1.classList.remove('show'); pl1.classList.add('hidden'); }
         }
     }
 
@@ -555,7 +555,7 @@ class BitcoinPriceGauge {
     async renderHistoryChart() {
         try {
             const hl = document.getElementById('historyLoading');
-            if (hl) hl.classList.remove('hidden');
+            if (hl) { hl.classList.add('show'); hl.classList.remove('hidden'); }
             if (!this._historyCache) {
                 const r = await fetch(this.historyUrl);
                 if (!r.ok) throw new Error('Failed to fetch history');
@@ -731,7 +731,7 @@ class BitcoinPriceGauge {
             console.warn('Chart render failed:', e);
         } finally {
             const hl = document.getElementById('historyLoading');
-            if (hl) hl.classList.add('hidden');
+            if (hl) { hl.classList.remove('show'); hl.classList.add('hidden'); }
         }
     }
 
