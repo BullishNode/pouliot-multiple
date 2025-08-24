@@ -11,6 +11,12 @@
         .loading-overlay.show { display: flex; }
         .spinner { width: 24px; height: 24px; border: 3px solid #e5e7eb; border-top-color: #111827; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        /* Chart sizing and mobile tweaks */
+        .chart-card canvas { width: 100% !important; height: 260px; }
+        @media (max-width: 640px) {
+            .chart-card canvas { height: 180px; }
+            .zoom-btn { padding: 6px 10px; font-size: 11px; }
+        }
         /* removed old toggle styles */
 
         /* Responsive Dial (Horizontal) */
@@ -190,20 +196,20 @@
 
     <!-- Historical Chart -->
     <div class="container mx-auto px-6 max-w-4xl">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6 relative">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6 relative chart-card">
             <div class="flex items-center justify-between mb-2">
                 <div class="text-sm text-gray-600">Historical price (left axis) and price multiple R (right axis)</div>
                 <div class="flex items-center gap-2">
-                    <button id="zoomAll" class="px-2 py-1 text-xs border rounded">All time</button>
-                    <button id="zoom4y" class="px-2 py-1 text-xs border rounded">4 years</button>
-                    <button id="zoom1y" class="px-2 py-1 text-xs border rounded">Last year</button>
-                    <button id="zoom1m" class="px-2 py-1 text-xs border rounded">Last month</button>
+                    <button id="zoomAll" class="px-2 py-1 text-xs border rounded zoom-btn">All time</button>
+                    <button id="zoom4y" class="px-2 py-1 text-xs border rounded zoom-btn">4 years</button>
+                    <button id="zoom1y" class="px-2 py-1 text-xs border rounded zoom-btn">Last year</button>
+                    <button id="zoom1m" class="px-2 py-1 text-xs border rounded zoom-btn">Last month</button>
                 </div>
             </div>
             <canvas id="historyChart" height="120"></canvas>
             <div id="historyLoading" class="loading-overlay hidden"><div class="spinner"></div></div>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6 relative">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6 relative chart-card">
             <div class="text-sm text-gray-600 mb-2">Historical price (left axis) and vol-adjusted percentile of R (right axis)</div>
             <canvas id="percentileChart" height="120"></canvas>
             <div id="percentileLoading" class="loading-overlay hidden"><div class="spinner"></div></div>

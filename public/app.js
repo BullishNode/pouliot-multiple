@@ -108,7 +108,8 @@ class BitcoinPriceGauge {
                     scales: {
                         x: {
                             type: 'category',
-                            ticks: { maxTicksLimit: 8,
+                            ticks: {
+                                maxTicksLimit: 6,
                                 callback: function(value) {
                                     let label = (this && this.getLabelForValue) ? this.getLabelForValue(value) : (typeof value === 'string' ? value : String(value));
                                     const d = new Date(label);
@@ -123,7 +124,7 @@ class BitcoinPriceGauge {
                             type: 'linear',
                             position: 'left',
                             title: { display: true, text: 'USD' },
-                            ticks: { callback: (val) => (isFinite(val) ? `$${Number(val).toLocaleString()}` : '--') }
+                            ticks: { callback: (val) => (isFinite(val) ? `$${Number(val).toLocaleString()}` : '--'), maxTicksLimit: 5 }
                         },
                         y1: {
                             type: 'linear',
@@ -132,7 +133,7 @@ class BitcoinPriceGauge {
                             title: { display: true, text: '%' },
                             min: 0,
                             max: 100,
-                            ticks: { callback: (val) => (isFinite(val) ? `${Number(val).toFixed(0)}%` : '--') }
+                            ticks: { callback: (val) => (isFinite(val) ? `${Number(val).toFixed(0)}%` : '--'), maxTicksLimit: 5 }
                         }
                     },
                     plugins: {
@@ -650,7 +651,8 @@ class BitcoinPriceGauge {
                     scales: {
                         x: {
                             type: 'category',
-                            ticks: { maxTicksLimit: 8,
+                            ticks: {
+                                maxTicksLimit: 6,
                                 callback: function(value) {
                                     let label = (this && this.getLabelForValue) ? this.getLabelForValue(value) : (typeof value === 'string' ? value : String(value));
                                     const d = new Date(label);
@@ -664,13 +666,15 @@ class BitcoinPriceGauge {
                         y: {
                             type: 'linear',
                             position: 'left',
-                            title: { display: true, text: 'USD' }
+                            title: { display: true, text: 'USD' },
+                            ticks: { maxTicksLimit: 5 }
                         },
                         y1: {
                             type: 'linear',
                             position: 'right',
                             grid: { drawOnChartArea: false },
-                            title: { display: true, text: 'R' }
+                            title: { display: true, text: 'Multiple' },
+                            ticks: { maxTicksLimit: 5 }
                         }
                     },
                     plugins: {
